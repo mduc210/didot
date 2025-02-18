@@ -1,41 +1,42 @@
-import logging
+import telebot
 import requests
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+import json
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
+# Thay token bot vào đây
+TOKEN = "NHẬP_TOKEN_BOT_VÀO_ĐÂY"
+API = "https://freefire-virusteam.vercel.app/likes"
 
-logger = logging.getLogger(__name__)
+bot = telebot.TeleBot(TOKEN)
 
-async def like(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if context.args:
-        uid = context.args[0]
-        url = f"https://freefire-virusteam.vercel.app/likes?key=23092003&uid={uid}"
-        
-        try:
-            response = requests.get(url)
+@bot.message_handler(commands=["start"])
+def start(message):
+    bot.reply_to(message, "🔥 Bot buff like Free Fire đã sẵn sàng!\nDùng lệnh: /like <uid> để buff like.")
+
+@bot.message_handler(commands=["like"])
+def like_user(message):
+    try:
+        args = message.text.split()
+
+        if len(args) < 2:
+            bot.reply_to(message, "⚠️ Sai cú pháp!\n👉 Dùng: /like <uid>")
+            return
+
+        uid = args[1]
+
+        params = {"key": "23092003", "uid": uid}
+        response = requests.get(API, params=params)
+
+        if response.status_code == 200:
             data = response.json()
+            message_text = data.get("message", "Không có phản hồi từ API.")
+            bot.reply_to(message, f"✅ Đã like UID {uid}!\n📩 Phản hồi: {message_text}")
+        else:
+            bot.reply_to(message, f"❌ Lỗi khi like UID {uid}: {response.text}")
 
-            if 'message' in data:
-                await update.message.reply_text(data['message'])
-            
-            else:
-                await update.message.reply_text("Không có thông tin phản hồi từ API.")
-            
-        except Exception as e:
-            await update.message.reply_text("Có lỗi xảy ra khi gọi API.")
-            logger.error(f"Error: {e}")
-    else:
-        await update.message.reply_text("Vui lòng nhập UID sau lệnh /like.")
+    except json.JSONDecodeError:
+        bot.reply_to(message, "❌ API không trả về JSON hợp lệ!")
+    except Exception as e:
+        bot.reply_to(message, f"❌ Lỗi: {str(e)}")
 
-def main() -> None:
-    # Thay 'apy' bằng token của bot 
-    application = ApplicationBuilder().token("apy").build()
-
-    application.add_handler(CommandHandler("like", like))
-
-    application.run_polling()
-
-if __name__ == '__main__':
-    main()
+print("🚀 Bot đang chạy...")
+bot.polling()
